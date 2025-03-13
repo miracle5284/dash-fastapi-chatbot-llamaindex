@@ -1,10 +1,12 @@
 from pathlib import Path
 from chatbot import config
 from chatbot.utils import return_or_throw, extract_attrs
-
+from dotenv import load_dotenv
 from llama_index.core.indices.base import BaseIndex
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 
+# Load environment variables from .env file
+load_dotenv()
 
 DOCUMENTS_FOLDER, INDEXES_PATHS = extract_attrs(config, 'DOCUMENTS_FOLDER', 'INDEXES_PATHS')
 FAQ_INDEX_NAME = "faq_index"
