@@ -70,8 +70,8 @@ The easiest way to get started is using our PowerShell automation script:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/chatbot.git
-   cd chatbot
+   git clone https://github.com/miracle5284/dash-fastapi-chatbot-llamaindex.git
+   cd dash-fastapi-chatbot-llamaindex
    ```
 
 2. Run the automation script:
