@@ -1,5 +1,6 @@
-dash-fastapi-chatbot-env/
-.env
+venv/
+venv**/
+.env*
 **/store/
 .idea/
 **/__pycache__/
