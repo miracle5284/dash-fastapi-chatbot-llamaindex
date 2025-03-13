@@ -99,19 +99,39 @@ To stop the application:
 
 If you prefer manual setup or are using a different operating system:
 
-1. Install dependencies:
+1. Install Python 3.12:
+   - Download Python 3.12 from [python.org](https://www.python.org/downloads/)
+   - Run the installer and make sure to check "Add Python to PATH"
+   - Verify installation by running:
+     ```bash
+     python --version
+     ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   # Create virtual environment
+   python -m venv venv
+
+   # Activate virtual environment
+   # On Windows:
+   .\venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Set up environment variables:
+4. Set up environment variables:
    - Create a `.env` file with:
      ```
      OPENAI_API_KEY=your_api_key_here
      OPENAI_MODEL_NAME=gpt-3.5-turbo
      ```
 
-3. Start the servers:
+5. Start the servers:
    ```bash
    # Start FastAPI server
    uvicorn chatbot.server:app --reload
