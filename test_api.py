@@ -13,35 +13,124 @@ def test_authentication():
     """Test user registration and login"""
     print("=== Testing Authentication ===")
     
-    # Test user registration
-    register_data = {
-        "username": "testuser",
-        "email": "test@example.com",
+    # Test admin user registration (will be created as student)
+    admin_data = {
+        "username": "admin",
+        "email": "admin@example.com",
+        "first_name": "Admin",
+        "last_name": "User",
+        "password": "adminpassword123"
+    }
+    
+    response = requests.post(f"{BASE_URL}/register", json=admin_data)
+    print(f"Admin register response: {response.status_code}")
+    if response.status_code == 200:
+        user_data = response.json()
+        print(f"Admin created: {user_data['username']} - {user_data['first_name']} {user_data['last_name']} ({user_data['user_type']})")
+    
+    # Test student user registration
+    student_data = {
+        "username": "student",
+        "email": "student@example.com",
         "first_name": "John",
-        "last_name": "Doe",
+        "last_name": "Student",
+        "password": "studentpassword123"
+    }
+    
+    response = requests.post(f"{BASE_URL}/register", json=student_data)
+    print(f"Student register response: {response.status_code}")
+    if response.status_code == 200:
+        user_data = response.json()
+        print(f"Student created: {user_data['username']} - {user_data['first_name']} {user_data['last_name']} ({user_data['user_type']})")
+    
+    # Test admin login
+    admin_login_data = {
+        "username": "admin",
+        "password": "adminpassword123"
+    }
+    
+    response = requests.post(f"{BASE_URL}/login", json=admin_login_data)
+    print(f"Admin login response: {response.status_code}")
+    if response.status_code == 200:
+        admin_token_data = response.json()
+        print(f"Admin token received: {admin_token_data['access_token'][:20]}...")
+        return admin_token_data['access_token'], "admin"
+    
+    return None, None
+
+def test_system_prompt_management(admin_token):
+    """Test system prompt management (admin only)"""
+    print("\n=== Testing System Prompt Management ===")
+    
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    
+    # Test getting current system prompt
+    response = requests.get(f"{BASE_URL}/system-prompt", headers=headers)
+    print(f"Get system prompt response: {response.status_code}")
+    if response.status_code == 200:
+        prompt_data = response.json()
+        print(f"Current system prompt: {prompt_data['prompt'][:100]}...")
+    
+    # Test updating system prompt
+    new_prompt = "You are a helpful AI assistant specialized in helping students with their questions. Be friendly and educational."
+    update_data = {"prompt": new_prompt}
+    
+    response = requests.put(f"{BASE_URL}/system-prompt", json=update_data, headers=headers)
+    print(f"Update system prompt response: {response.status_code}")
+    if response.status_code == 200:
+        update_data = response.json()
+        print(f"Updated system prompt: {update_data['prompt'][:100]}...")
+    
+    # Test getting updated prompt
+    response = requests.get(f"{BASE_URL}/system-prompt", headers=headers)
+    print(f"Get updated prompt response: {response.status_code}")
+    if response.status_code == 200:
+        prompt_data = response.json()
+        print(f"Updated system prompt: {prompt_data['prompt'][:100]}...")
+
+def test_student_access_restriction():
+    """Test that students cannot access admin functions"""
+    print("\n=== Testing Student Access Restrictions ===")
+    
+    # Register and login as student
+    student_data = {
+        "username": "teststudent",
+        "email": "teststudent@example.com",
+        "first_name": "Test",
+        "last_name": "Student",
         "password": "testpassword123"
     }
     
-    response = requests.post(f"{BASE_URL}/register", json=register_data)
-    print(f"Register response: {response.status_code}")
+    response = requests.post(f"{BASE_URL}/register", json=student_data)
     if response.status_code == 200:
-        user_data = response.json()
-        print(f"User created: {user_data['username']} - {user_data['first_name']} {user_data['last_name']}")
+        print("Test student created")
     
-    # Test login
+    # Login as student
     login_data = {
-        "username": "testuser",
+        "username": "teststudent",
         "password": "testpassword123"
     }
     
     response = requests.post(f"{BASE_URL}/login", json=login_data)
-    print(f"Login response: {response.status_code}")
     if response.status_code == 200:
-        token_data = response.json()
-        print(f"Token received: {token_data['access_token'][:20]}...")
-        return token_data['access_token']
-    
-    return None
+        student_token = response.json()['access_token']
+        print("Test student logged in")
+        
+        # Try to access admin-only endpoints
+        headers = {"Authorization": f"Bearer {student_token}"}
+        
+        # Test getting system prompt (should fail)
+        response = requests.get(f"{BASE_URL}/system-prompt", headers=headers)
+        print(f"Student trying to get system prompt: {response.status_code}")
+        if response.status_code == 403:
+            print("✓ Student correctly blocked from getting system prompt")
+        
+        # Test updating system prompt (should fail)
+        update_data = {"prompt": "This should fail"}
+        response = requests.put(f"{BASE_URL}/system-prompt", json=update_data, headers=headers)
+        print(f"Student trying to update system prompt: {response.status_code}")
+        if response.status_code == 403:
+            print("✓ Student correctly blocked from updating system prompt")
 
 def test_chat_functionality(token):
     """Test chat functionality"""
@@ -100,16 +189,22 @@ def main():
     print("Starting API tests...")
     
     # Test authentication
-    token = test_authentication()
-    if not token:
+    admin_token, user_type = test_authentication()
+    if not admin_token:
         print("Authentication failed!")
         return
     
+    # Test system prompt management (admin only)
+    test_system_prompt_management(admin_token)
+    
+    # Test student access restrictions
+    test_student_access_restriction()
+    
     # Test chat functionality
-    chat_id = test_chat_functionality(token)
+    chat_id = test_chat_functionality(admin_token)
     
     # Test getting all chats
-    test_get_chats(token)
+    test_get_chats(admin_token)
     
     print("\n=== Tests completed ===")
 

@@ -14,6 +14,7 @@ class User(Base):
     email = Column(String(100), unique=True, index=True, nullable=False)
     first_name = Column(String(50), nullable=True)
     last_name = Column(String(50), nullable=True)
+    user_type = Column(String(20), nullable=False, default="student")  # "admin" or "student"
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())

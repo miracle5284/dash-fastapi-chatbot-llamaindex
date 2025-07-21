@@ -8,15 +8,18 @@ import os
 from .indexing import get_faq_index
 from .schemas import (
     Query, Message, PromptRequest, UserCreate, UserLogin, Token, 
-    UserResponse, ChatResponse, ChatListResponse, AIResponseRequest, AIResponseResponse
+    UserResponse, ChatResponse, ChatListResponse, AIResponseRequest, AIResponseResponse,
+    SystemPromptResponse, SystemPromptUpdate
 )
 from .chatbot import send_prompt_to_openai
-from .database import get_db, create_tables
+from .database import get_db, create_tables, check_database_schema
 from .models import User, Chat, Message as MessageModel
 from .auth import (
     get_password_hash, verify_password, create_access_token, 
     get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from .prompt_manager import prompt_manager
+from .admin_setup import create_default_admin
 
 # Initialize FastAPI app
 app = FastAPI(title="Chatbot API", version="1.0.0")
@@ -25,10 +28,31 @@ app = FastAPI(title="Chatbot API", version="1.0.0")
 # index = get_faq_index()
 # engine = index.as_query_engine()
 
-# Create database tables on startup
+# Create database tables and default admin on startup
 @app.on_event("startup")
 async def startup_event():
-    create_tables()
+    # Check if database schema needs migration
+    schema_updated = check_database_schema()
+    
+    # Only create tables if they don't exist or were recreated
+    if schema_updated:
+        print("🔄 Tables were recreated, creating admin user...")
+    else:
+        # Tables exist and are up to date, just ensure they exist
+        create_tables()
+        print("✅ Database tables are ready.")
+    
+    # Always try to create admin user
+    create_default_admin()
+
+# Helper function to check if user is admin
+def require_admin(current_user: User = Depends(get_current_user)):
+    if current_user.user_type != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
 
 # Authentication endpoints
 @app.post("/register", response_model=UserResponse)
@@ -43,13 +67,14 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             detail="Username or email already registered"
         )
     
-    # Create new user
+    # Create new user (always as student)
     hashed_password = get_password_hash(user.password)
     db_user = User(
         username=user.username,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
+        user_type="student",  # Always create as student
         hashed_password=hashed_password
     )
     db.add(db_user)
@@ -78,6 +103,28 @@ async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
 @app.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
+
+# System Prompt Management (Admin Only)
+@app.get("/system-prompt", response_model=SystemPromptResponse)
+async def get_system_prompt(current_user: User = Depends(require_admin)):
+    """Get the current system prompt (Admin only)"""
+    prompt = prompt_manager.get_prompt()
+    return SystemPromptResponse(prompt=prompt)
+
+@app.put("/system-prompt", response_model=SystemPromptResponse)
+async def update_system_prompt(
+    prompt_update: SystemPromptUpdate,
+    current_user: User = Depends(require_admin)
+):
+    """Update the system prompt (Admin only)"""
+    success = prompt_manager.set_prompt(prompt_update.prompt)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update system prompt"
+        )
+    
+    return SystemPromptResponse(prompt=prompt_update.prompt)
 
 # Chat management endpoints
 @app.get("/chats", response_model=ChatListResponse)
@@ -118,10 +165,8 @@ async def get_ai_response(
 ):
     """Get AI response for a user question, optionally creating a new chat or using existing one"""
     
-    # Read system prompt
-    system_prompt_path = os.path.join(os.path.dirname(__file__), "..", "system_prompt.txt")
-    with open(system_prompt_path, 'r') as file:
-        system_prompt = file.read().strip()
+    # Get system prompt dynamically
+    system_prompt = prompt_manager.get_prompt()
     
     messages = []
     
