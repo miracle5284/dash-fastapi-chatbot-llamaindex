@@ -30,9 +30,12 @@ def send_prompt_to_openai(messages: list[dict], system_prompt_file: str = "syste
     # Convert messages to the format expected by langchain_openai
     formatted_messages = [SystemMessage(content=system_prompt)]
     for msg in messages:
-        if msg.role == 'user':
-            formatted_messages.append(HumanMessage(content=msg.content))
-        elif msg.role == 'assistant':
-            formatted_messages.append(AIMessage(content=msg.content))
+        if msg['role'] == 'user':
+            formatted_messages.append(HumanMessage(content=msg['content']))
+        elif msg['role'] == 'assistant':
+            formatted_messages.append(AIMessage(content=msg['content']))
+        elif msg['role'] == 'system':
+            # Skip system messages as we already have the system prompt
+            continue
     response = chat.invoke(formatted_messages)
     return response.text()
